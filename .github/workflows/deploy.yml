@@ -10,16 +10,26 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Trigger Coolify deploy
+      - name: Check secrets
+        id: check
         run: |
-          curl -s -o response.txt -w "%{http_code}" \
+          if [ -z "${{ secrets.COOLIFY_WEBHOOK_URL }}" ]; then
+            echo "COOLIFY_WEBHOOK_URL no configurado — saltando deploy."
+            echo "skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Trigger Coolify deploy
+        if: steps.check.outputs.skip == 'false'
+        run: |
+          HTTP_STATUS=$(curl -s -o response.txt -w "%{http_code}" \
             -X GET "${{ secrets.COOLIFY_WEBHOOK_URL }}" \
-            -H "Authorization: Bearer ${{ secrets.COOLIFY_TOKEN }}" > status_code.txt
-          STATUS=$(cat status_code.txt)
-          echo "HTTP Status: $STATUS"
+            -H "Authorization: Bearer ${{ secrets.COOLIFY_TOKEN }}")
+          echo "HTTP Status: $HTTP_STATUS"
           cat response.txt
-          if [ "$STATUS" != "200" ] && [ "$STATUS" != "201" ]; then
-            echo "Deploy failed with status $STATUS"
+          if [ "$HTTP_STATUS" != "200" ] && [ "$HTTP_STATUS" != "201" ]; then
+            echo "Deploy fallido con status $HTTP_STATUS"
             exit 1
           fi
-          echo "Deploy triggered successfully"
+          echo "Deploy disparado correctamente"
