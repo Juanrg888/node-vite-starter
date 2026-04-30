@@ -1,0 +1,25 @@
+name: Deploy API to Coolify
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'api/**'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Coolify deploy
+        run: |
+          curl -s -o response.txt -w "%{http_code}" \
+            -X GET "${{ secrets.COOLIFY_WEBHOOK_URL }}" \
+            -H "Authorization: Bearer ${{ secrets.COOLIFY_TOKEN }}" > status_code.txt
+          STATUS=$(cat status_code.txt)
+          echo "HTTP Status: $STATUS"
+          cat response.txt
+          if [ "$STATUS" != "200" ] && [ "$STATUS" != "201" ]; then
+            echo "Deploy failed with status $STATUS"
+            exit 1
+          fi
+          echo "Deploy triggered successfully"
