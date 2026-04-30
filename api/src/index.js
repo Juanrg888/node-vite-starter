@@ -1,7 +1,8 @@
 require('dotenv').config();
-const express = require('express');
-const cors    = require('cors');
+const express      = require('express');
+const cors         = require('cors');
 const errorHandler = require('./middleware/errorHandler');
+const runMigrations = require('../scripts/migrate');
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
@@ -16,4 +17,12 @@ app.use('/ejemplo', require('./routes/ejemplo'));  // reemplazar con rutas reale
 // ── Error handler ─────────────────────────────────────────────────────────────
 app.use(errorHandler);
 
-app.listen(PORT, () => console.log(`API corriendo en puerto ${PORT}`));
+// ── Arranque ───────────────────────────────────────────────────────────────────
+runMigrations()
+  .then(() => {
+    app.listen(PORT, () => console.log(`API corriendo en puerto ${PORT}`));
+  })
+  .catch(err => {
+    console.error('Servidor no arranca: falló una migración.', err.message);
+    process.exit(1);
+  });
