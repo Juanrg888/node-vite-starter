@@ -42,17 +42,20 @@ Write-Host "`nSetup Coolify -- $RepoName`n" -ForegroundColor Yellow
 
 # -- 1. Auto-detectar servidor --
 Write-Step "1/7" "Detectando servidor Coolify..."
-$servers    = Invoke-RestMethod -Uri "$CoolifyURL/api/v1/servers" -Headers $hC
-$server     = $servers.data | Select-Object -First 1
-if (-not $server) { throw "No se encontro ningun servidor en Coolify." }
+$servers = Invoke-RestMethod -Uri "$CoolifyURL/api/v1/servers" -Headers $hC
+# La API devuelve el array directamente (no dentro de .data)
+$server  = if ($servers -is [array]) { $servers | Select-Object -First 1 } else { $servers }
+if (-not $server -or -not $server.uuid) { throw "No se encontro ningun servidor en Coolify." }
 $serverUUID = $server.uuid
 Write-OK "Servidor: $($server.name) ($serverUUID)"
 
 # -- 2. Auto-detectar GitHub App --
 Write-Step "2/7" "Detectando GitHub App..."
-$sources   = Invoke-RestMethod -Uri "$CoolifyURL/api/v1/sources" -Headers $hC
-$ghApp     = $sources | Where-Object { $_.type -like "*github*" -or $_.source_type -like "*Github*" } | Select-Object -First 1
-if (-not $ghApp) { throw "No se encontro GitHub App en Coolify. Configurala primero en Sources." }
+$sources = Invoke-RestMethod -Uri "$CoolifyURL/api/v1/sources" -Headers $hC
+$ghApp   = if ($sources -is [array]) {
+    $sources | Where-Object { $_.type -like "*github*" -or $_.source_type -like "*Github*" } | Select-Object -First 1
+} else { $sources }
+if (-not $ghApp -or -not $ghApp.uuid) { throw "No se encontro GitHub App en Coolify. Configurala primero en Sources." }
 $ghAppUUID = $ghApp.uuid
 Write-OK "GitHub App: $($ghApp.name) ($ghAppUUID)"
 
@@ -103,9 +106,9 @@ Write-OK "App: $appUUID"
 # -- 6. Variables de entorno (runtime-only) --
 Write-Step "6/7" "Configurando variables de entorno..."
 $envVars = @(
-    @{ key = "NODE_ENV";     value = "production";                   is_build_time = $false },
-    @{ key = "PORT";         value = $ApiPort;                       is_build_time = $false },
-    @{ key = "DATABASE_URL"; value = '${Postgres.DATABASE_URL}';     is_build_time = $false }
+    @{ key = "NODE_ENV";     value = "production";               is_build_time = $false },
+    @{ key = "PORT";         value = $ApiPort;                   is_build_time = $false },
+    @{ key = "DATABASE_URL"; value = '${Postgres.DATABASE_URL}'; is_build_time = $false }
 )
 foreach ($var in $envVars) {
     Invoke-RestMethod -Uri "$CoolifyURL/api/v1/applications/$appUUID/envs" `
@@ -119,7 +122,6 @@ Write-Step "7/7" "Actualizando GitHub..."
 
 $deployUrl = "$CoolifyURL/api/v1/deploy?uuid=$appUUID&force=false"
 
-# Construir el YAML como string simple (sin here-string para evitar problemas de escape)
 $lines = @(
     "name: Deploy to Coolify",
     "on:",
