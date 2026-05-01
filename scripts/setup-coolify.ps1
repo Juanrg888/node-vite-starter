@@ -48,10 +48,9 @@ if (-not $server -or -not $server.uuid) { throw "No se encontro ningun servidor 
 $serverUUID = $server.uuid
 Write-OK "Servidor: $($server.name) ($serverUUID)"
 
-# -- 2. Auto-detectar GitHub App (endpoint correcto: /api/v1/github-apps) --
+# -- 2. Auto-detectar GitHub App --
 Write-Step "2/7" "Detectando GitHub App..."
 $ghApps = Invoke-RestMethod -Uri "$CoolifyURL/api/v1/github-apps" -Headers $hC
-# Preferir la app no-publica (la GitHub App real, no "Public GitHub")
 $ghApp  = if ($ghApps -is [array]) {
     $ghApps | Where-Object { $_.is_public -eq $false } | Select-Object -First 1
 } else { $ghApps }
@@ -67,20 +66,20 @@ $projectUUID = $project.uuid
 Write-OK "Proyecto: $projectUUID"
 
 # -- 4. Crear base de datos PostgreSQL --
+# Endpoint correcto: POST /api/v1/databases/postgresql (tipo va en la URL, no en el body)
 Write-Step "4/7" "Creando PostgreSQL..."
 $dbName     = ($RepoName -replace "[^a-zA-Z0-9]", "_")
 $dbPassword = -join ((65..90 + 97..122 + 48..57) | Get-Random -Count 24 | ForEach-Object { [char]$_ })
 $body = @{
-    type              = "standalone-postgresql"
-    name              = "$RepoName-db"
-    project_uuid      = $projectUUID
-    server_uuid       = $serverUUID
-    environment_name  = "production"
-    postgres_user     = "appuser"
+    name             = "$RepoName-db"
+    project_uuid     = $projectUUID
+    server_uuid      = $serverUUID
+    environment_name = "production"
+    postgres_user    = "appuser"
     postgres_password = $dbPassword
-    postgres_db       = $dbName
+    postgres_db      = $dbName
 } | ConvertTo-Json
-$db     = Invoke-RestMethod -Uri "$CoolifyURL/api/v1/databases" -Method POST -Headers $hC -Body $body
+$db     = Invoke-RestMethod -Uri "$CoolifyURL/api/v1/databases/postgresql" -Method POST -Headers $hC -Body $body
 $dbUUID = $db.uuid
 Write-OK "BD: $dbUUID"
 
