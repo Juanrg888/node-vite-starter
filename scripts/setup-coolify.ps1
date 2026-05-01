@@ -43,19 +43,19 @@ Write-Host "`nSetup Coolify -- $RepoName`n" -ForegroundColor Yellow
 # -- 1. Auto-detectar servidor --
 Write-Step "1/7" "Detectando servidor Coolify..."
 $servers = Invoke-RestMethod -Uri "$CoolifyURL/api/v1/servers" -Headers $hC
-# La API devuelve el array directamente (no dentro de .data)
 $server  = if ($servers -is [array]) { $servers | Select-Object -First 1 } else { $servers }
 if (-not $server -or -not $server.uuid) { throw "No se encontro ningun servidor en Coolify." }
 $serverUUID = $server.uuid
 Write-OK "Servidor: $($server.name) ($serverUUID)"
 
-# -- 2. Auto-detectar GitHub App --
+# -- 2. Auto-detectar GitHub App (endpoint correcto: /api/v1/github-apps) --
 Write-Step "2/7" "Detectando GitHub App..."
-$sources = Invoke-RestMethod -Uri "$CoolifyURL/api/v1/sources" -Headers $hC
-$ghApp   = if ($sources -is [array]) {
-    $sources | Where-Object { $_.type -like "*github*" -or $_.source_type -like "*Github*" } | Select-Object -First 1
-} else { $sources }
-if (-not $ghApp -or -not $ghApp.uuid) { throw "No se encontro GitHub App en Coolify. Configurala primero en Sources." }
+$ghApps = Invoke-RestMethod -Uri "$CoolifyURL/api/v1/github-apps" -Headers $hC
+# Preferir la app no-publica (la GitHub App real, no "Public GitHub")
+$ghApp  = if ($ghApps -is [array]) {
+    $ghApps | Where-Object { $_.is_public -eq $false } | Select-Object -First 1
+} else { $ghApps }
+if (-not $ghApp -or -not $ghApp.uuid) { throw "No se encontro GitHub App privada en Coolify." }
 $ghAppUUID = $ghApp.uuid
 Write-OK "GitHub App: $($ghApp.name) ($ghAppUUID)"
 
