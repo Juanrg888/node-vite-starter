@@ -66,27 +66,27 @@ $projectUUID = $project.uuid
 Write-OK "Proyecto: $projectUUID"
 
 # -- 4. Crear base de datos PostgreSQL --
-# Endpoint correcto: POST /api/v1/databases/postgresql (tipo va en la URL, no en el body)
+# Tipo va en la URL: POST /api/v1/databases/postgresql
 Write-Step "4/7" "Creando PostgreSQL..."
 $dbName     = ($RepoName -replace "[^a-zA-Z0-9]", "_")
 $dbPassword = -join ((65..90 + 97..122 + 48..57) | Get-Random -Count 24 | ForEach-Object { [char]$_ })
 $body = @{
-    name             = "$RepoName-db"
-    project_uuid     = $projectUUID
-    server_uuid      = $serverUUID
-    environment_name = "production"
-    postgres_user    = "appuser"
+    name              = "$RepoName-db"
+    project_uuid      = $projectUUID
+    server_uuid       = $serverUUID
+    environment_name  = "production"
+    postgres_user     = "appuser"
     postgres_password = $dbPassword
-    postgres_db      = $dbName
+    postgres_db       = $dbName
 } | ConvertTo-Json
 $db     = Invoke-RestMethod -Uri "$CoolifyURL/api/v1/databases/postgresql" -Method POST -Headers $hC -Body $body
 $dbUUID = $db.uuid
 Write-OK "BD: $dbUUID"
 
 # -- 5. Crear aplicacion --
+# Tipo va en la URL: POST /api/v1/applications/private-github-app
 Write-Step "5/7" "Creando aplicacion..."
 $body = @{
-    type                = "private-github-app"
     name                = "$RepoName-api"
     project_uuid        = $projectUUID
     server_uuid         = $serverUUID
@@ -98,16 +98,16 @@ $body = @{
     github_app_uuid     = $ghAppUUID
     ports_exposes       = $ApiPort
 } | ConvertTo-Json
-$app     = Invoke-RestMethod -Uri "$CoolifyURL/api/v1/applications" -Method POST -Headers $hC -Body $body
+$app     = Invoke-RestMethod -Uri "$CoolifyURL/api/v1/applications/private-github-app" -Method POST -Headers $hC -Body $body
 $appUUID = $app.uuid
-Write-OK "App: $appUUID"
+Write-OK "App: $appUUID  ->  $($app.domains)"
 
 # -- 6. Variables de entorno (runtime-only) --
 Write-Step "6/7" "Configurando variables de entorno..."
 $envVars = @(
-    @{ key = "NODE_ENV";     value = "production";               is_build_time = $false },
-    @{ key = "PORT";         value = $ApiPort;                   is_build_time = $false },
-    @{ key = "DATABASE_URL"; value = '${Postgres.DATABASE_URL}'; is_build_time = $false }
+    @{ key = "NODE_ENV";     value = "production"; is_build_time = $false },
+    @{ key = "PORT";         value = $ApiPort;     is_build_time = $false },
+    @{ key = "DATABASE_URL"; value = ""; is_build_time = $false }  # placeholder; Coolify la inyecta via linked resource
 )
 foreach ($var in $envVars) {
     Invoke-RestMethod -Uri "$CoolifyURL/api/v1/applications/$appUUID/envs" `
