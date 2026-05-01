@@ -66,7 +66,6 @@ $projectUUID = $project.uuid
 Write-OK "Proyecto: $projectUUID"
 
 # -- 4. Crear base de datos PostgreSQL --
-# Tipo va en la URL: POST /api/v1/databases/postgresql
 Write-Step "4/7" "Creando PostgreSQL..."
 $dbName     = ($RepoName -replace "[^a-zA-Z0-9]", "_")
 $dbPassword = -join ((65..90 + 97..122 + 48..57) | Get-Random -Count 24 | ForEach-Object { [char]$_ })
@@ -84,7 +83,6 @@ $dbUUID = $db.uuid
 Write-OK "BD: $dbUUID"
 
 # -- 5. Crear aplicacion --
-# Tipo va en la URL: POST /api/v1/applications/private-github-app
 Write-Step "5/7" "Creando aplicacion..."
 $body = @{
     name                = "$RepoName-api"
@@ -102,12 +100,12 @@ $app     = Invoke-RestMethod -Uri "$CoolifyURL/api/v1/applications/private-githu
 $appUUID = $app.uuid
 Write-OK "App: $appUUID  ->  $($app.domains)"
 
-# -- 6. Variables de entorno (runtime-only) --
+# -- 6. Variables de entorno --
+# Formato correcto: { key, value, is_preview } - sin is_build_time
 Write-Step "6/7" "Configurando variables de entorno..."
 $envVars = @(
-    @{ key = "NODE_ENV";     value = "production"; is_build_time = $false },
-    @{ key = "PORT";         value = $ApiPort;     is_build_time = $false },
-    @{ key = "DATABASE_URL"; value = ""; is_build_time = $false }  # placeholder; Coolify la inyecta via linked resource
+    @{ key = "NODE_ENV"; value = "production"; is_preview = $false },
+    @{ key = "PORT";     value = $ApiPort;     is_preview = $false }
 )
 foreach ($var in $envVars) {
     Invoke-RestMethod -Uri "$CoolifyURL/api/v1/applications/$appUUID/envs" `
